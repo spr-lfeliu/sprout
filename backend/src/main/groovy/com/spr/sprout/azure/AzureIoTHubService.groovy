@@ -11,7 +11,7 @@ class AzureIoTHubService {
 
     private static final Logger log = LoggerFactory.getLogger(this.getClass());
 
-    public static final CONNECTION_STRING = "DeviceId=1f0031000347343337373737;HostName=SPRoutHub.azure-devices.net;SharedAccessKeyName=iothubowner;SharedAccessKey=4js5/kMgT7qzZ27UwunwHPdHJ3BTrq8OaLR5mbFBLyA="
+    public static final CONNECTION_STRING = "HostName=SPRoutHub.azure-devices.net;DeviceId=SPRout00001;SharedAccessKey=C8BUEHrl9HyoU0npWcF7kXJZoFklH/uAzSP3LbchKmY="
 
     protected static class EventCallback implements IotHubEventCallback {
 
