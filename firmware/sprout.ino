@@ -327,8 +327,10 @@ int executeServerCommand(String command) {
         return 5;
     } else if (command == "ok") {
         display_ok();
+        return 6;
     } else if (command == "error") {
         display_error();
+        return 7;
     } else {
         return -1;
     }
