@@ -1,14 +1,13 @@
-// This #include statement was automatically added by the Particle IDE.
-#include "spark-dallas-temperature/spark-dallas-temperature.h"
-
-// This #include statement was automatically added by the Particle IDE.
-#include "OneWire/OneWire.h"
-
-// This #include statement was automatically added by the Particle IDE.
-#include "Adafruit_DHT/Adafruit_DHT.h"
+#include "spark-dallas-temperature/spark-dallas-temperature.h" // Used for soil temperature sensor
+#include "OneWire/OneWire.h" // Used for soil temperature sensor
+#include "Adafruit_DHT/Adafruit_DHT.h" // Used for air sensor (air temperature and moisture)
 
 #define BAUD_RATE 57600
 #define TIME_DELAY_MILLISECONDS 5000
+
+#define PIN_RGB_LED_RED B0
+#define PIN_RGB_LED_GREEN B1
+#define PIN_RGB_LED_BLUE B2
 
 // Soil moisture sensor
 // The moisture sensor raw data values vary between 0 and about 2500. 
@@ -24,9 +23,6 @@ DallasTemperature sensors(&oneWire);
 // Values are converted.
 // Temperature is in degrees Farenheit.
 // Moisture is given as Relative humidity (accurate between 20 and 80 %)
-float air_humidity;
-float air_temperature;
-
 #define DHT_TYPE DHT11
 #define DHT_PIN D0
 
@@ -42,7 +38,7 @@ volatile bool pb_great_pressed = false;
 volatile bool pb_not_good_pressed = false;
 
 // Variables
-// GET https://api.particle.io/v1/devices/{DEVICE_ID}/{VARIABLE}?access_token=token
+// GET https://api.particle.io/v1/devices/{DEVICE_ID}/{VARIABLE}?format=raw&access_token=token
 // Up to 10 cloud variables may be defined and each variable name is limited to a maximum of 12 characters
 
 double var_air_temperature;
@@ -51,8 +47,10 @@ double var_soil_temperature;
 int var_soil_moisture;
 int var_light;
 
-bool isFirstRun = true;
 bool isDeviceActive = false;
+enum Color { red, green, blue, yellow };
+Color rgbState;
+bool isRgbOn = true;
 
 // Functions
 // POST /v1/devices/{DEVICE_ID}/{FUNCTION}
@@ -61,6 +59,9 @@ bool isDeviceActive = false;
 
 int executeServerCommand(String command);
 
+// Timers
+Timer rgbLedTimer(1000, blinkRgb);
+
 void setup() {
    Serial.begin(BAUD_RATE);
    init_air_sensor();
@@ -68,6 +69,7 @@ void setup() {
    setup_push_buttons();
    register_variables();
    register_functions();
+   setup_rgb_led();
 }
 
 void init_air_sensor() {
@@ -91,84 +93,123 @@ void setup_push_buttons() {
 }
 
 void register_functions() {
-    Particle.function("execute", executeServerCommand);
+    Particle.function("x", executeServerCommand);
 }
 
 void register_variables() {
-    Particle.variable("airTemp", var_air_temperature);
-    Particle.variable("airRH", var_air_humidity);
-    Particle.variable("soilTemp", var_soil_temperature);
-    Particle.variable("soilMoisture", var_soil_moisture);
-    Particle.variable("light", var_light);
+    Particle.variable("aT", var_air_temperature);
+    Particle.variable("aH", var_air_humidity);
+    Particle.variable("sT", var_soil_temperature);
+    Particle.variable("sM", var_soil_moisture);
+    Particle.variable("L", var_light);
+}
+
+void setup_rgb_led() {
+    pinMode(PIN_RGB_LED_RED, OUTPUT);
+    pinMode(PIN_RGB_LED_GREEN, OUTPUT);
+    pinMode(PIN_RGB_LED_BLUE, OUTPUT);  
 }
 
 void loop() {
     if (isDeviceActive) {
-        read_data();
+        update_variables();
         send_data();
         check_push_buttons_state();
-        update_variables();
+        check_errors();
     } else {
-        display_error();
+        display_inactive();
     }
-    delay(TIME_DELAY_MILLISECONDS);
+}
+
+void setColor(int red, int green, int blue)
+{
+  analogWrite(PIN_RGB_LED_RED, red);
+  analogWrite(PIN_RGB_LED_GREEN, green);
+  analogWrite(PIN_RGB_LED_BLUE, blue);  
+}
+
+void turnRed() {
+    rgbState = red;
+    isRgbOn = true;
+    setColor(255, 0, 0);
+}
+
+void turnBlue() {
+    rgbState = blue;
+    isRgbOn = true;
+    setColor(0, 0, 255);
+}
+
+void turnGreen() {
+    rgbState = green;
+    isRgbOn = true;
+    setColor(0, 255, 0);
+}
+
+void turnYellow() {
+    rgbState = yellow;
+    isRgbOn = true;
+    setColor(255, 255, 0);
+}
+
+void turnOff() {
+    isRgbOn = false;
+    setColor(0, 0, 0);
+}
+
+void blinkRgb() {
+    if (isRgbOn) {
+        turnOff();
+    } else { 
+        switch(rgbState) {
+            case red:
+                turnRed();
+                break;
+            case green:
+                turnGreen();
+                break;
+            case blue:
+                turnBlue();
+                break;
+            case yellow:
+                turnYellow();
+                break;
+        }
+    }
+}
+
+void blinkBlue() {
+    turnBlue();
+    rgbLedTimer.start();
+}
+
+void blinkYellow() {
+    turnYellow();
+    rgbLedTimer.start();
+}
+
+void blinkRed() {
+    turnRed();
+    rgbLedTimer.start();
 }
 
 void update_variables() {
-    if (isFirstRun) {
-        isFirstRun = false;
-        var_air_temperature = getAirTemp();
-        var_air_humidity = getAirMoisture();
-        var_soil_temperature = getSoilTemp();
-        var_soil_moisture = getSoilMoisture();
-        var_light = getLight();
-    } else {
-        double temp_air_temp = getAirTemp();
-        if (abs(var_air_temperature - temp_air_temp) >= 1.0 ) {
-            var_air_temperature = temp_air_temp;
-        }
-        double temp_air_humidity = getAirMoisture();
-        if (abs(var_air_humidity - temp_air_humidity) >= 1.0) {
-            var_air_humidity = temp_air_humidity;
-        }
-        double temp_soil_temp = getSoilTemp();
-        if (abs(var_soil_temperature - temp_soil_temp) >= 1.0) {
-            var_soil_temperature = temp_soil_temp;
-        }
-        int temp_soil_moisture = getSoilMoisture();
-        if (abs(var_soil_moisture - temp_soil_moisture) >= 25) {
-            var_soil_moisture = temp_soil_moisture;
-        }
-        int temp_light = getLight();
-        if (abs(var_light - temp_light) >= 41) {
-            var_light = temp_light;
-        }
-    }
-}
-
-void read_data() {
-    read_air_sensor();
+    var_air_temperature = getAirTemp();
+    var_air_humidity = getAirMoisture();
+    var_soil_temperature = getSoilTemp();
+    var_soil_moisture = getSoilMoisture();
+    var_light = getLight();
 }
 
 void send_data() {
     String data = "{" \
-    "\"deviceId\":\"" + System.deviceID() + "\"," \
-    "\"soilTemperature\":" + String(getSoilTemp()) + "," \
-    "\"soilMoisture\":" + String(getSoilMoisture()) + "," \
-    "\"airTemperature\":" + String(air_temperature) + "," \
-    "\"airMoisture\":" + String(air_humidity) + "," \
-    "\"light\":" + String(getLight()) + \
+    "\"sT\":" + String(var_soil_temperature) + "," \
+    "\"sM\":" + String(var_soil_moisture) + "," \
+    "\"aT\":" + String(var_air_temperature) + "," \
+    "\"aH\":" + String(var_air_humidity) + "," \
+    "\"L\":" + String(var_light) + \
     "}";
-    Particle.publish("sprout-data", data, 60, PRIVATE);
-}
-
-void read_air_sensor() {
-  air_humidity = getAirMoisture();
-  air_temperature = getAirTemp();
-  if (isnan(air_humidity) || isnan(air_temperature)) {
-      air_temperature = -500.0;
-      air_humidity = -1;
-  }
+    Particle.publish("data", data, 60, PRIVATE);
 }
 
 void push_button_ok_isr() {
@@ -195,44 +236,57 @@ void push_button_not_good_isr() {
 void check_push_buttons_state() {
     if (pb_ok_pressed) {
         pb_ok_pressed = false;
-        Particle.publish("button-pressed", "ok");
+        Particle.publish("btn", "ok");
         // TODO: turn off button led
     }
     if (pb_great_pressed) {
         pb_great_pressed = false;
-        Particle.publish("button-pressed", "great");
+        Particle.publish("btn", "grt");
         // TODO: turn off button led
     }
     if (pb_not_good_pressed) {
         pb_not_good_pressed = false;
-        Particle.publish("button-pressed", "not-good");
+        Particle.publish("btn", "bad");
         // TODO: turn off button led
     }
 }
 
 void display_too_wet() {
-    // TODO
+    rgbLedTimer.stop();
+    turnBlue();
 }
 
 void display_water_needed() {
-    // TODO
+    blinkBlue();
 }
 
 void display_portal() {
-    // TODO
+    blinkYellow();
 }
 
 void display_ok() {
-    // TODO
+    rgbLedTimer.stop();
+    turnGreen();
 }
 
 void display_error() {
-    // TODO
+    rgbLedTimer.stop();
+    turnRed();
+}
+
+void display_inactive() {
+    blinkRed();
+}
+
+void check_errors() {// TODO: add more checks (i.e., disconnected sensors based on pin value, low battery/charge, faults, etc.)
+    if (!Cellular.ready()) {
+        turnRed();
+    }
 }
 
 float getSoilTemp() {
     sensors.requestTemperatures();
-    return 9.0/5.0 * sensors.getTempCByIndex(0) + 32;
+    return sensors.getTempFByIndex(0);
 }
 
 int getSoilMoisture() {
@@ -252,24 +306,29 @@ int getLight() {
 }
 
 int executeServerCommand(String command) {
-    if(command == "sprout") {
+    if(command == "data") {
+        update_variables();
         send_data();
         return 0;
     } else if (command == "portal") {
         display_portal();
         return 1;
-    } else if (command == "water") {
+    } else if (command == "h2o") {
         display_water_needed();
         return 2;
-    } else if (command == "activate") { 
+    } else if (command == "act") { 
         isDeviceActive = true;
         return 3;
-    } else if (command == "deactivate") { 
+    } else if (command == "deact") { 
         isDeviceActive = false;
         return 4;
     } else if (command == "dry") {
         display_too_wet();
         return 5;
+    } else if (command == "ok") {
+        display_ok();
+    } else if (command == "error") {
+        display_error();
     } else {
         return -1;
     }
