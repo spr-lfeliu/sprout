@@ -47,7 +47,7 @@ double var_soil_temperature;
 int var_soil_moisture;
 int var_light;
 
-volatile bool isDeviceActived = false;
+volatile bool isDeviceActivated = false;
 enum Color { red, green, blue, yellow };
 volatile Color rgbState;
 volatile bool isRgbOn = true;
@@ -113,7 +113,7 @@ void setup_rgb_led() {
 }
 
 void loop() {
-    if (isDeviceActived) {
+    if (isDeviceActivated) {
         update_variables();
         check_push_buttons_state();
         check_errors();
@@ -322,11 +322,11 @@ int executeServerCommand(String command) {
         display_water_needed();
         return 2;
     } else if (command == "act") { 
-        isDeviceActived = true;
+        isDeviceActivated = true;
         display_ok();
         return 3;
     } else if (command == "deact") { 
-        isDeviceActived = false;
+        isDeviceActivated = false;
         return 4;
     } else if (command == "dry") {
         display_too_wet();
