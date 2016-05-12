@@ -3,7 +3,7 @@
 #include "Adafruit_DHT/Adafruit_DHT.h" // Used for air sensor (air temperature and moisture)
 
 #define BAUD_RATE 57600
-#define TIME_DELAY_MILLISECONDS 5000
+#define TIME_DELAY_MILLISECONDS 1000
 
 #define PIN_RGB_LED_RED B0
 #define PIN_RGB_LED_GREEN B1
@@ -47,10 +47,11 @@ double var_soil_temperature;
 int var_soil_moisture;
 int var_light;
 
-bool isDeviceActive = false;
+volatile bool isDeviceActived = false;
 enum Color { red, green, blue, yellow };
-Color rgbState;
-bool isRgbOn = true;
+volatile Color rgbState;
+volatile bool isRgbOn = true;
+String lastCommand = "";
 
 // Functions
 // POST /v1/devices/{DEVICE_ID}/{FUNCTION}
@@ -70,6 +71,7 @@ void setup() {
    register_variables();
    register_functions();
    setup_rgb_led();
+   // TODO: need to call endpoint to check if the device has been activated
 }
 
 void init_air_sensor() {
@@ -111,14 +113,14 @@ void setup_rgb_led() {
 }
 
 void loop() {
-    if (isDeviceActive) {
+    if (isDeviceActived) {
         update_variables();
-        send_data();
         check_push_buttons_state();
         check_errors();
     } else {
         display_inactive();
     }
+    delay(TIME_DELAY_MILLISECONDS);
 }
 
 void setColor(int red, int green, int blue)
@@ -281,6 +283,8 @@ void display_inactive() {
 void check_errors() {// TODO: add more checks (i.e., disconnected sensors based on pin value, low battery/charge, faults, etc.)
     if (!Cellular.ready()) {
         turnRed();
+    } else {
+        executeServerCommand(lastCommand);
     }
 }
 
@@ -306,6 +310,7 @@ int getLight() {
 }
 
 int executeServerCommand(String command) {
+    lastCommand = command;
     if(command == "data") {
         update_variables();
         send_data();
@@ -317,10 +322,11 @@ int executeServerCommand(String command) {
         display_water_needed();
         return 2;
     } else if (command == "act") { 
-        isDeviceActive = true;
+        isDeviceActived = true;
+        display_ok();
         return 3;
     } else if (command == "deact") { 
-        isDeviceActive = false;
+        isDeviceActived = false;
         return 4;
     } else if (command == "dry") {
         display_too_wet();
