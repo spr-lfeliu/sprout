@@ -1,3 +1,6 @@
+// This #include statement was automatically added by the Particle IDE.
+#include "feedback.h"
+
 #include "spark-dallas-temperature/spark-dallas-temperature.h" // Used for soil temperature sensor
 #include "OneWire/OneWire.h" // Used for soil temperature sensor
 #include "Adafruit_DHT/Adafruit_DHT.h" // Used for air sensor (air temperature and moisture)
@@ -8,6 +11,9 @@
 #define PIN_RGB_LED_RED B0
 #define PIN_RGB_LED_GREEN B1
 #define PIN_RGB_LED_BLUE B2
+#define PIN_BUTTON_LED_OK C0
+#define PIN_BUTTON_LED_GREAT C1
+#define PIN_BUTTON_LED_NOT_GOOD C2
 
 // Soil moisture sensor
 // The moisture sensor raw data values vary between 0 and about 2500. 
@@ -32,10 +38,6 @@ DHT dht(DHT_PIN, DHT_TYPE);
 // Raw value will be between 0 (low light) and 4095 (more light)
 #define PIN_LIGHT A1
 
-// Push buttons
-volatile bool pb_ok_pressed = false;
-volatile bool pb_great_pressed = false;
-volatile bool pb_not_good_pressed = false;
 
 // Variables
 // GET https://api.particle.io/v1/devices/{DEVICE_ID}/{VARIABLE}?format=raw&access_token=token
@@ -46,6 +48,8 @@ double var_air_humidity;
 double var_soil_temperature;
 int var_soil_moisture;
 int var_light;
+
+Feedback feedback = Feedback(PIN_BUTTON_LED_OK, PIN_BUTTON_LED_GREAT, PIN_BUTTON_LED_NOT_GOOD);
 
 volatile bool isDeviceActivated = false;
 enum Color { red, green, blue, yellow };
@@ -215,42 +219,37 @@ void send_data() {
 }
 
 void push_button_ok_isr() {
-    if(!pb_ok_pressed) {
-        pb_ok_pressed = true;
-        // TODO: turn on led
+    if(!feedback.isOk()) {
+        feedback.ButtonPressed(Feedback::Button::ok);
     }
 }
 
 void push_button_great_isr() {
-    if (!pb_great_pressed) {
-        pb_great_pressed = true;
-        // TODO: turn on led
+    if(!feedback.isGreat()) {
+        feedback.ButtonPressed(Feedback::Button::great);
     }
 }
 
 void push_button_not_good_isr() {
-    if (pb_not_good_pressed) {
-        pb_not_good_pressed = true;
-        // TODO: turn on led
+    if(!feedback.isNotGood()) {
+        feedback.ButtonPressed(Feedback::Button::notgood);
     }
 }
 
 void check_push_buttons_state() {
-    if (pb_ok_pressed) {
-        pb_ok_pressed = false;
-        Particle.publish("btn", "ok");
-        // TODO: turn off button led
+    Feedback::Button state = feedback.GetButtonPressed();
+    switch(state) {
+        case Feedback::ok:
+            Particle.publish("btn", "ok");
+            break;
+        case Feedback::great:
+            Particle.publish("btn", "grt");
+            break;
+        case Feedback::notgood:
+            Particle.publish("btn", "bad");
+            break;
     }
-    if (pb_great_pressed) {
-        pb_great_pressed = false;
-        Particle.publish("btn", "grt");
-        // TODO: turn off button led
-    }
-    if (pb_not_good_pressed) {
-        pb_not_good_pressed = false;
-        Particle.publish("btn", "bad");
-        // TODO: turn off button led
-    }
+    feedback.Reset();
 }
 
 void display_too_wet() {
