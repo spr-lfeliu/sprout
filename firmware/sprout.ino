@@ -283,7 +283,9 @@ void check_errors() {// TODO: add more checks (i.e., disconnected sensors based 
     if (!Cellular.ready()) {
         turnRed();
     } else {
-        executeServerCommand(lastCommand);
+        if (lastCommand != "data") {
+            executeServerCommand(lastCommand);
+        }
     }
 }
 
