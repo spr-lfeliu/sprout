@@ -5,22 +5,22 @@ class Feedback
 {
     
 public:
-    enum Button { ok, great, notgood, none };
+    enum Button { neutral, positive, negative, none };
 
-    Feedback(int pin_ok, int pin_great, int pin_notgood);
+    Feedback(int pin_neutral, int pin_positive, int pin_negative);
     
     void ButtonPressed(Button button) { m_feedback_button = button; }
     void Reset();
  
-    bool isOk() { return m_feedback_button == ok; }
-    bool isGreat() { return m_feedback_button == great; }
-    bool isNotGood() { return m_feedback_button == notgood; }
+    bool isNeutral() { return m_feedback_button == neutral; }
+    bool isPositive() { return m_feedback_button == positive; }
+    bool isNegative() { return m_feedback_button == negative; }
     bool isFeedback() { return m_feedback_button != none; }
     Button GetButtonPressed() { return m_feedback_button; }
     
 private:
 
-    int m_pin_ok, m_pin_great, m_pin_notgood;
+    int m_pin_neutral, m_pin_positive, m_pin_negative;
     Button m_feedback_button;
     
     void TurnLedOn(Button button);
