@@ -1,4 +1,7 @@
 // This #include statement was automatically added by the Particle IDE.
+#include "notifications.h"
+
+// This #include statement was automatically added by the Particle IDE.
 #include "feedback.h"
 
 #include "spark-dallas-temperature/spark-dallas-temperature.h" // Used for soil temperature sensor
@@ -11,9 +14,9 @@
 #define PIN_RGB_LED_RED B0
 #define PIN_RGB_LED_GREEN B1
 #define PIN_RGB_LED_BLUE B2
-#define PIN_BUTTON_LED_OK C0
-#define PIN_BUTTON_LED_GREAT C1
-#define PIN_BUTTON_LED_NOT_GOOD C2
+#define PIN_BUTTON_LED_NEUTRAL C0
+#define PIN_BUTTON_LED_POSITIVE C1
+#define PIN_BUTTON_LED_NEGATIVE C2
 
 // Soil moisture sensor
 // The moisture sensor raw data values vary between 0 and about 2500. 
@@ -49,7 +52,7 @@ double var_soil_temperature;
 int var_soil_moisture;
 int var_light;
 
-Feedback feedback = Feedback(PIN_BUTTON_LED_OK, PIN_BUTTON_LED_GREAT, PIN_BUTTON_LED_NOT_GOOD);
+Feedback feedback = Feedback(PIN_BUTTON_LED_NEUTRAL, PIN_BUTTON_LED_POSITIVE, PIN_BUTTON_LED_NEGATIVE);
 
 volatile bool isDeviceActivated = false;
 enum Color { red, green, blue, yellow };
@@ -87,15 +90,15 @@ void init_soil_temp_sensor() {
 }
 
 void setup_push_buttons() {
-   // PB OK 
+   // PB NEUTRAL 
    pinMode(D5, INPUT_PULLUP);
-   attachInterrupt(D5, push_button_ok_isr, RISING);
-   // PB GREAT
+   attachInterrupt(D5, push_button_neutral_isr, RISING);
+   // PB POSITIVE
    pinMode(D6, INPUT_PULLUP);
-   attachInterrupt(D6, push_button_great_isr, RISING);
+   attachInterrupt(D6, push_button_positive_isr, RISING);
    // PB NOT GOOD
    pinMode(D7, INPUT_PULLUP);
-   attachInterrupt(D7, push_button_not_good_isr, RISING);
+   attachInterrupt(D7, push_button_negative_isr, RISING);
 }
 
 void register_functions() {
@@ -218,35 +221,35 @@ void send_data() {
     Particle.publish("data", data, 60, PRIVATE);
 }
 
-void push_button_ok_isr() {
-    if(!feedback.isOk()) {
-        feedback.ButtonPressed(Feedback::Button::ok);
+void push_button_neutral_isr() {
+    if(!feedback.isNeutral()) {
+        feedback.ButtonPressed(Feedback::Button::neutral);
     }
 }
 
-void push_button_great_isr() {
-    if(!feedback.isGreat()) {
-        feedback.ButtonPressed(Feedback::Button::great);
+void push_button_positive_isr() {
+    if(!feedback.isPositive()) {
+        feedback.ButtonPressed(Feedback::Button::positive);
     }
 }
 
-void push_button_not_good_isr() {
-    if(!feedback.isNotGood()) {
-        feedback.ButtonPressed(Feedback::Button::notgood);
+void push_button_negative_isr() {
+    if(!feedback.isNegative()) {
+        feedback.ButtonPressed(Feedback::Button::negative);
     }
 }
 
 void check_push_buttons_state() {
     Feedback::Button state = feedback.GetButtonPressed();
     switch(state) {
-        case Feedback::ok:
-            Particle.publish("btn", "ok");
+        case Feedback::neutral:
+            Particle.publish("f", "n");
             break;
-        case Feedback::great:
-            Particle.publish("btn", "grt");
+        case Feedback::positive:
+            Particle.publish("f", "+");
             break;
-        case Feedback::notgood:
-            Particle.publish("btn", "bad");
+        case Feedback::negative:
+            Particle.publish("f", "-");
             break;
     }
     feedback.Reset();
