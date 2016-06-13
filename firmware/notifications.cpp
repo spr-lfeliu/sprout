@@ -1,11 +1,18 @@
 #include "notifications.h"
 #include "application.h"
 
+Notifications::Notifications()
+{
+  
+}
+
 Notifications::Notifications(int pin_rgb_led_red, int pin_rgb_led_green,int pin_rgb_led_blue)
 {
     m_pin_rgb_red = pin_rgb_led_red;
     m_pin_rgb_green = pin_rgb_led_green;
     m_pin_rgb_blue = pin_rgb_led_blue;
+    m_non_water_notification = all_ok;
+    m_water_notification = water_none;
     Setup();
 }
 
@@ -16,7 +23,6 @@ void Notifications::Setup()
     pinMode(m_pin_rgb_blue, OUTPUT);
     m_led_toggle = false;
     m_display_water_led = false;
-    // Timer timer(64, this::DisplayLed);
 }
 
 void Notifications::SetNotification(Notification notification)
@@ -26,7 +32,8 @@ void Notifications::SetNotification(Notification notification)
     } else {
         m_non_water_notification = notification;
     }
-
+    Timer timer(1530, &Notifications::DisplayLed, *this);
+    timer.start();
 }
 
 bool Notifications::IsWaterNotification(Notification notification) {
@@ -65,6 +72,7 @@ void Notifications::FadeIn(Notifications::Color color)
     analogWrite(m_pin_rgb_red, brightness);
     analogWrite(m_pin_rgb_green, brightness);
     analogWrite(m_pin_rgb_blue, brightness);
+    delay(15);
   }
 }
 
@@ -74,6 +82,7 @@ void Notifications::FadeOut(Notifications::Color color)
     analogWrite(m_pin_rgb_red, brightness);
     analogWrite(m_pin_rgb_green, brightness);
     analogWrite(m_pin_rgb_blue, brightness);
+    delay(15);
   }
 }
 

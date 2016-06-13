@@ -8,6 +8,7 @@ public:
     Notifications(int pin_rgb_led_red, int pin_rgb_led_green,int pin_rgb_led_blue);
     enum Notification { all_ok, portal, water_deficit, water_excess, failure, water_none };
     void SetNotification(Notification);
+    void DisplayLed();
 
 private:
     struct Color {
@@ -27,7 +28,6 @@ private:
     void Setup();
     bool IsWaterNotification(Notification);
     void SetLedColor(Color);
-    void DisplayLed();
     void SetLedToggle();
     void ToggleWaterLed();
     void FadeIn(Color);
