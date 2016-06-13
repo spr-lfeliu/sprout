@@ -7,6 +7,7 @@ Feedback::Feedback(int pin_neutral, int pin_positive, int pin_negative)
     m_pin_neutral = pin_neutral;
     m_pin_positive = pin_positive;
     m_pin_negative = pin_negative;
+    Setup();
 }
 
 void Feedback::Reset() 

@@ -1,15 +1,11 @@
-// This #include statement was automatically added by the Particle IDE.
 #include "notifications.h"
-
-// This #include statement was automatically added by the Particle IDE.
 #include "feedback.h"
-
-#include "spark-dallas-temperature/spark-dallas-temperature.h" // Used for soil temperature sensor
-#include "OneWire/OneWire.h" // Used for soil temperature sensor
-#include "Adafruit_DHT/Adafruit_DHT.h" // Used for air sensor (air temperature and moisture)
+#include "spark-dallas-temperature.h" // Used for soil temperature sensor
+#include "OneWire.h" // Used for soil temperature sensor
+#include "Adafruit_DHT.h" // Used for air sensor (air temperature and moisture)
 
 #define BAUD_RATE 57600
-#define TIME_DELAY_MILLISECONDS 1000
+#define TIME_DELAY_MILLISECONDS 60000
 
 #define PIN_RGB_LED_RED B0
 #define PIN_RGB_LED_GREEN B1
@@ -19,7 +15,7 @@
 #define PIN_BUTTON_LED_NEGATIVE C2
 
 // Soil moisture sensor
-// The moisture sensor raw data values vary between 0 and about 2500. 
+// The moisture sensor raw data values vary between 0 and about 2500.
 // Low values mean less moisture while higher values mean more moisture.
 #define PIN_SOIL_MOISTURE A0
 
@@ -35,12 +31,11 @@ DallasTemperature sensors(&oneWire);
 #define DHT_TYPE DHT11
 #define DHT_PIN D0
 
-DHT dht(DHT_PIN, DHT_TYPE); 
+DHT dht(DHT_PIN, DHT_TYPE);
 
 // Light sensor
 // Raw value will be between 0 (low light) and 4095 (more light)
 #define PIN_LIGHT A1
-
 
 // Variables
 // GET https://api.particle.io/v1/devices/{DEVICE_ID}/{VARIABLE}?format=raw&access_token=token
@@ -53,11 +48,9 @@ int var_soil_moisture;
 int var_light;
 
 Feedback feedback = Feedback(PIN_BUTTON_LED_NEUTRAL, PIN_BUTTON_LED_POSITIVE, PIN_BUTTON_LED_NEGATIVE);
+Notifications notifications = Notifications(PIN_RGB_LED_RED, PIN_RGB_LED_GREEN, PIN_RGB_LED_BLUE);
 
 volatile bool isDeviceActivated = false;
-enum Color { red, green, blue, yellow };
-volatile Color rgbState;
-volatile bool isRgbOn = true;
 String lastCommand = "";
 
 // Functions
@@ -67,9 +60,6 @@ String lastCommand = "";
 
 int executeServerCommand(String command);
 
-// Timers
-Timer rgbLedTimer(1000, blinkRgb);
-
 void setup() {
    Serial.begin(BAUD_RATE);
    init_air_sensor();
@@ -77,7 +67,6 @@ void setup() {
    setup_push_buttons();
    register_variables();
    register_functions();
-   setup_rgb_led();
    // TODO: need to call endpoint to check if the device has been activated
 }
 
@@ -90,7 +79,7 @@ void init_soil_temp_sensor() {
 }
 
 void setup_push_buttons() {
-   // PB NEUTRAL 
+   // PB NEUTRAL
    pinMode(D5, INPUT_PULLUP);
    attachInterrupt(D5, push_button_neutral_isr, RISING);
    // PB POSITIVE
@@ -113,93 +102,15 @@ void register_variables() {
     Particle.variable("L", var_light);
 }
 
-void setup_rgb_led() {
-    pinMode(PIN_RGB_LED_RED, OUTPUT);
-    pinMode(PIN_RGB_LED_GREEN, OUTPUT);
-    pinMode(PIN_RGB_LED_BLUE, OUTPUT);  
-}
-
 void loop() {
     if (isDeviceActivated) {
         update_variables();
-        check_push_buttons_state();
+        check_push_buttons_state(); // TODO: Move to feedback
         check_errors();
     } else {
-        display_inactive();
+        display_error();
     }
     delay(TIME_DELAY_MILLISECONDS);
-}
-
-void setColor(int red, int green, int blue)
-{
-  analogWrite(PIN_RGB_LED_RED, red);
-  analogWrite(PIN_RGB_LED_GREEN, green);
-  analogWrite(PIN_RGB_LED_BLUE, blue);  
-}
-
-void turnRed() {
-    rgbState = red;
-    isRgbOn = true;
-    setColor(255, 0, 0);
-}
-
-void turnBlue() {
-    rgbState = blue;
-    isRgbOn = true;
-    setColor(0, 0, 255);
-}
-
-void turnGreen() {
-    rgbState = green;
-    isRgbOn = true;
-    setColor(0, 255, 0);
-}
-
-void turnYellow() {
-    rgbState = yellow;
-    isRgbOn = true;
-    setColor(255, 255, 0);
-}
-
-void turnOff() {
-    isRgbOn = false;
-    setColor(0, 0, 0);
-}
-
-void blinkRgb() {
-    if (isRgbOn) {
-        turnOff();
-    } else { 
-        switch(rgbState) {
-            case red:
-                turnRed();
-                break;
-            case green:
-                turnGreen();
-                break;
-            case blue:
-                turnBlue();
-                break;
-            case yellow:
-                turnYellow();
-                break;
-        }
-    }
-}
-
-void blinkBlue() {
-    turnBlue();
-    rgbLedTimer.start();
-}
-
-void blinkYellow() {
-    turnYellow();
-    rgbLedTimer.start();
-}
-
-void blinkRed() {
-    turnRed();
-    rgbLedTimer.start();
 }
 
 void update_variables() {
@@ -211,6 +122,7 @@ void update_variables() {
 }
 
 void send_data() {
+    update_variables();
     String data = "{" \
     "\"sT\":" + String(var_soil_temperature) + "," \
     "\"sM\":" + String(var_soil_moisture) + "," \
@@ -218,7 +130,7 @@ void send_data() {
     "\"aH\":" + String(var_air_humidity) + "," \
     "\"L\":" + String(var_light) + \
     "}";
-    Particle.publish("data", data, 60, PRIVATE);
+    Particle.publish("d", data, 60, PRIVATE);
 }
 
 void push_button_neutral_isr() {
@@ -255,36 +167,13 @@ void check_push_buttons_state() {
     feedback.Reset();
 }
 
-void display_too_wet() {
-    rgbLedTimer.stop();
-    turnBlue();
-}
-
-void display_water_needed() {
-    blinkBlue();
-}
-
-void display_portal() {
-    blinkYellow();
-}
-
-void display_ok() {
-    rgbLedTimer.stop();
-    turnGreen();
-}
-
 void display_error() {
-    rgbLedTimer.stop();
-    turnRed();
-}
-
-void display_inactive() {
-    blinkRed();
+    notifications.SetNotification(Notifications::Notification::failure);
 }
 
 void check_errors() {// TODO: add more checks (i.e., disconnected sensors based on pin value, low battery/charge, faults, etc.)
     if (!Cellular.ready()) {
-        turnRed();
+      display_error();
     } else {
         if (lastCommand != "data") {
             executeServerCommand(lastCommand);
@@ -315,33 +204,34 @@ int getLight() {
 
 int executeServerCommand(String command) {
     lastCommand = command;
-    if(command == "data") {
-        update_variables();
+    if(command == "d") {
         send_data();
         return 0;
-    } else if (command == "portal") {
-        display_portal();
+    } else if (command == "p") {
+        notifications.SetNotification(Notifications::Notification::portal);
         return 1;
-    } else if (command == "h2o") {
-        display_water_needed();
+    } else if (command == "w-") {
+        notifications.SetNotification(Notifications::Notification::water_deficit);
         return 2;
-    } else if (command == "act") { 
+    } else if (command == "a") {
         isDeviceActivated = true;
-        display_ok();
         return 3;
-    } else if (command == "deact") { 
+    } else if (command == "a-") {
         isDeviceActivated = false;
         return 4;
-    } else if (command == "dry") {
-        display_too_wet();
+    } else if (command == "w+") {
+        notifications.SetNotification(Notifications::Notification::water_excess);
         return 5;
-    } else if (command == "ok") {
-        display_ok();
+    } else if (command == "k") {
+        notifications.SetNotification(Notifications::Notification::all_ok);
         return 6;
-    } else if (command == "error") {
-        display_error();
+    } else if (command == "e") {
+        notifications.SetNotification(Notifications::Notification::failure);
         return 7;
-    } else {
+    } else if (command == "w0") {
+        notifications.SetNotification(Notifications::Notification::water_none);
+        return 8;
+    }else {
         return -1;
     }
 }
