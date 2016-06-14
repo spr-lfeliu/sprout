@@ -10,7 +10,7 @@ Feedback::Feedback(int pin_neutral, int pin_positive, int pin_negative)
     Setup();
 }
 
-void Feedback::Reset() 
+void Feedback::Reset()
 {
     m_feedback_button = none;
 }

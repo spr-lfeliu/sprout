@@ -1,11 +1,12 @@
 #include "notifications.h"
 #include "feedback.h"
-#include "spark-dallas-temperature.h" // Used for soil temperature sensor
-#include "OneWire.h" // Used for soil temperature sensor
-#include "Adafruit_DHT.h" // Used for air sensor (air temperature and moisture)
+
+#include "spark-dallas-temperature/spark-dallas-temperature.h" // Used for soil temperature sensor
+#include "OneWire/OneWire.h" // Used for soil temperature sensor
+#include "Adafruit_DHT/Adafruit_DHT.h" // Used for air sensor (air temperature and moisture)
 
 #define BAUD_RATE 57600
-#define TIME_DELAY_MILLISECONDS 60000
+#define TIME_DELAY_MILLISECONDS 100
 
 #define PIN_RGB_LED_RED B0
 #define PIN_RGB_LED_GREEN B1
@@ -49,6 +50,8 @@ int var_light;
 
 Feedback feedback = Feedback(PIN_BUTTON_LED_NEUTRAL, PIN_BUTTON_LED_POSITIVE, PIN_BUTTON_LED_NEGATIVE);
 Notifications notifications = Notifications(PIN_RGB_LED_RED, PIN_RGB_LED_GREEN, PIN_RGB_LED_BLUE);
+Timer ledTimer(3060, breatheLed);
+volatile bool isCycleLed = true;
 
 volatile bool isDeviceActivated = false;
 String lastCommand = "";
@@ -67,6 +70,7 @@ void setup() {
    setup_push_buttons();
    register_variables();
    register_functions();
+   ledTimer.start();
    // TODO: need to call endpoint to check if the device has been activated
 }
 
@@ -85,7 +89,7 @@ void setup_push_buttons() {
    // PB POSITIVE
    pinMode(D6, INPUT_PULLUP);
    attachInterrupt(D6, push_button_positive_isr, RISING);
-   // PB NOT GOOD
+   // PB NEGATIVE
    pinMode(D7, INPUT_PULLUP);
    attachInterrupt(D7, push_button_negative_isr, RISING);
 }
@@ -109,6 +113,10 @@ void loop() {
         check_errors();
     } else {
         display_error();
+    }
+    if (isCycleLed) {
+        isCycleLed = false;
+        notifications.DisplayLed();
     }
     delay(TIME_DELAY_MILLISECONDS);
 }
@@ -202,36 +210,40 @@ int getLight() {
     return analogRead(PIN_LIGHT);
 }
 
+void breatheLed() {
+    isCycleLed = true;
+}
+
 int executeServerCommand(String command) {
     lastCommand = command;
+    int return_value = -1;
     if(command == "d") {
         send_data();
-        return 0;
+        return_value = 0;
     } else if (command == "p") {
         notifications.SetNotification(Notifications::Notification::portal);
-        return 1;
+        return_value = 1;
     } else if (command == "w-") {
         notifications.SetNotification(Notifications::Notification::water_deficit);
-        return 2;
+        return_value = 2;
     } else if (command == "a") {
         isDeviceActivated = true;
-        return 3;
+        return_value = 3;
     } else if (command == "a-") {
         isDeviceActivated = false;
-        return 4;
+        return_value = 4;
     } else if (command == "w+") {
         notifications.SetNotification(Notifications::Notification::water_excess);
-        return 5;
+        return_value = 5;
     } else if (command == "k") {
         notifications.SetNotification(Notifications::Notification::all_ok);
-        return 6;
+        return_value = 6;
     } else if (command == "e") {
         notifications.SetNotification(Notifications::Notification::failure);
-        return 7;
+        return_value = 7;
     } else if (command == "w0") {
         notifications.SetNotification(Notifications::Notification::water_none);
-        return 8;
-    }else {
-        return -1;
+        return_value = 8;
     }
+    return return_value;
 }

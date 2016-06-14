@@ -1,20 +1,5 @@
 #include "notifications.h"
-#include "application.h"
 
-Notifications::Notifications()
-{
-  
-}
-
-Notifications::Notifications(int pin_rgb_led_red, int pin_rgb_led_green,int pin_rgb_led_blue)
-{
-    m_pin_rgb_red = pin_rgb_led_red;
-    m_pin_rgb_green = pin_rgb_led_green;
-    m_pin_rgb_blue = pin_rgb_led_blue;
-    m_non_water_notification = all_ok;
-    m_water_notification = water_none;
-    Setup();
-}
 
 void Notifications::Setup()
 {
@@ -25,18 +10,23 @@ void Notifications::Setup()
     m_display_water_led = false;
 }
 
-void Notifications::SetNotification(Notification notification)
+void Notifications::SetNotification(Notifications::Notification notification)
 {
-    if (IsWaterNotification(notification)) {
-        m_water_notification = notification;
+    if (m_water_notification == notification || m_non_water_notification == notification) {
+        // do nothing, notification is already enacted
     } else {
-        m_non_water_notification = notification;
+        if (IsWaterNotification(notification)) {
+            m_water_notification = notification;
+        } else {
+            m_non_water_notification = notification;
+        }
+        if (notification == all_ok) {
+            m_water_notification = water_none;
+        }
     }
-    Timer timer(1530, &Notifications::DisplayLed, *this);
-    timer.start();
 }
 
-bool Notifications::IsWaterNotification(Notification notification) {
+bool Notifications::IsWaterNotification(Notifications::Notification notification) {
     return notification == water_deficit || notification == water_excess || notification == water_none;
 }
 
@@ -54,6 +44,9 @@ void Notifications::ToggleWaterLed()
   if (m_led_toggle) {
     m_display_water_led = !m_display_water_led;
   }
+  if (m_water_notification == water_none) {
+      m_display_water_led = false;
+  }
 }
 
 void Notifications::DisplayLed()
@@ -61,44 +54,70 @@ void Notifications::DisplayLed()
   SetLedToggle();
   ToggleWaterLed();
   Notifications::Color color = Color();
-  SetLedColor(color);
+  SetLedColor(&color);
   FadeIn(color);
   FadeOut(color);
 }
 
 void Notifications::FadeIn(Notifications::Color color)
 {
-  for (int brightness = 0; brightness <= 255; brightness = brightness+ 5) {
-    analogWrite(m_pin_rgb_red, brightness);
-    analogWrite(m_pin_rgb_green, brightness);
-    analogWrite(m_pin_rgb_blue, brightness);
-    delay(15);
+  const bool is_increase_red = color.red_ > 0;
+  const bool is_increase_green = color.green_ > 0;
+  const bool is_increase_blue = color.blue_ > 0;
+  for (int brightness = 0; brightness <= 255; brightness = brightness + 5) {
+    if (is_increase_red) color.red_ = brightness;
+    if (is_increase_green) color.green_ = brightness;
+    if (is_increase_blue) color.blue_ = brightness;
+    analogWrite(m_pin_rgb_red, color.red_);
+    analogWrite(m_pin_rgb_green, color.green_);
+    analogWrite(m_pin_rgb_blue, color.blue_);
+    delay(30);
   }
 }
 
 void Notifications::FadeOut(Notifications::Color color)
 {
-  for (int brightness = 255; brightness >= 0; brightness = brightness - 5) {
-    analogWrite(m_pin_rgb_red, brightness);
-    analogWrite(m_pin_rgb_green, brightness);
-    analogWrite(m_pin_rgb_blue, brightness);
-    delay(15);
+  const bool is_decrease_red = color.red_ > 0;
+  const bool is_decrease_green = color.green_ > 0;
+  const bool is_decrease_blue = color.blue_ > 0;
+  for (int brightness = 255; brightness > 0; brightness = brightness - 5) {
+    if (is_decrease_red) color.red_ = brightness;
+    if (is_decrease_green) color.green_ = brightness;
+    if (is_decrease_blue) color.blue_ = brightness;
+    analogWrite(m_pin_rgb_red, color.red_);
+    analogWrite(m_pin_rgb_green, color.green_);
+    analogWrite(m_pin_rgb_blue, color.blue_);
+    delay(30);
   }
 }
 
-void Notifications::SetLedColor(Notifications::Color color)
+void Notifications::SetLedColor(Notifications::Color *color)
 {
   if (m_display_water_led) {
-    color.blue_ = 255;
+      if (m_water_notification == water_deficit) {
+          color->red_ = 0;
+          color->green_ = 0;
+          color->blue_ = 255;
+      } else if (m_water_notification == water_excess) {
+          color->red_ = 0;
+          color->green_ = 255;
+          color->blue_ = 255;
+      }
   } else if (m_non_water_notification == all_ok) {
-    color.green_ = 255;
+    color->red_ = 0;
+    color->green_ = 255;
+    color->blue_ = 0;
   } else if (m_non_water_notification == portal) {
-    color.red_ = 255;
-    color.green_ = 255;
+    color->red_ = 255;
+    color->green_ = 255;
+    color->blue_ = 0;
   } else if (m_non_water_notification == failure) {
-    color.red_ = 255;
+    color->red_ = 255;
+    color->green_ = 0;
+    color->blue_ = 0;
+  } else {
+    color->red_ = 0;
+    color->green_ = 255;
+    color->blue_ = 0;
   }
-  analogWrite(m_pin_rgb_red, color.red_);
-  analogWrite(m_pin_rgb_green, color.green_);
-  analogWrite(m_pin_rgb_blue, color.blue_);
 }
